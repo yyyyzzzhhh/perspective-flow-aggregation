@@ -62,7 +62,7 @@ def render_objects_pytorch3d(meshes, poses, K, w, h):
     focal_length = torch.cat((K[:,0,0].view(-1,1), K[:,1,1].view(-1,1)), axis=1)
     principal_point = torch.cat((K[:,0,2].view(-1,1), K[:,1,2].view(-1,1)), axis=1)
     image_size = (h, w)
-    image_size = np.array(image_size).reshape(1,2).repeat(batch_size,axis=0).astype(np.int)
+    image_size = np.array(image_size).reshape(1,2).repeat(batch_size,axis=0).astype(int)
     # 
     Rs = []
     Ts = []

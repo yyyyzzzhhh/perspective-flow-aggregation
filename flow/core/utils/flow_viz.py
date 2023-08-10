@@ -89,7 +89,7 @@ def flow_uv_to_colors(u, v, convert_to_bgr=False):
     rad = np.sqrt(np.square(u) + np.square(v))
     a = np.arctan2(-v, -u)/np.pi
     fk = (a+1) / 2*(ncols-1)
-    k0 = np.floor(fk).astype(np.int32)
+    k0 = np.floor(fk).astype(int32)
     k1 = k0 + 1
     k1[k1 == ncols] = 0
     f = fk - k0
@@ -145,8 +145,8 @@ def forward_warp_flow(img, flow):
     outImg.fill(255) # background
     validFlag = (flow[:,:,0] < 1e9)
     y1, x1 = validFlag.nonzero()
-    x2 = (x1 + flow[y1,x1,0] + 0.5).astype(np.int)
-    y2 = (y1 + flow[y1,x1,1] + 0.5).astype(np.int)
+    x2 = (x1 + flow[y1,x1,0] + 0.5).astype(int)
+    y2 = (y1 + flow[y1,x1,1] + 0.5).astype(int)
     x2[x2<0] = 0
     x2[x2>=width] = width-1
     y2[y2<0] = 0

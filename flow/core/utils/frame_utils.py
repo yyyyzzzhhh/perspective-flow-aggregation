@@ -22,8 +22,8 @@ def readFlow(fn):
             print('Magic number incorrect. Invalid .flo file')
             return None
         else:
-            w = np.fromfile(f, np.int32, count=1)
-            h = np.fromfile(f, np.int32, count=1)
+            w = np.fromfile(f, int32, count=1)
+            h = np.fromfile(f, int32, count=1)
             # print 'Reading %d x %d flo file\n' % (w, h)
             data = np.fromfile(f, np.float32, count=2*int(w)*int(h))
             # Reshape data into 3D array (columns, rows, bands)
@@ -89,8 +89,8 @@ def writeFlow(filename,uv,v=None):
     f = open(filename,'wb')
     # write the header
     f.write(TAG_CHAR)
-    np.array(width).astype(np.int32).tofile(f)
-    np.array(height).astype(np.int32).tofile(f)
+    np.array(width).astype(int32).tofile(f)
+    np.array(height).astype(int32).tofile(f)
     # arrange into matrix form
     tmp = np.zeros((height, width*nBands))
     tmp[:,np.arange(width)*2] = u
