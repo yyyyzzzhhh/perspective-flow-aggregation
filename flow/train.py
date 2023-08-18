@@ -1,5 +1,11 @@
 from __future__ import print_function, division
+
+
+import pdb
+
 import sys
+
+
 sys.path.append('core')
 
 from core.datasets import fetch_dataloader, render_objects_pytorch3d, GetFlowFromPoseAndDepth
@@ -33,6 +39,8 @@ import pytorch3d.renderer
 
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
+
 
 try:
     from torch.cuda.amp import GradScaler
@@ -54,7 +62,9 @@ except:
 # exclude extremly large displacements
 MAX_FLOW = 400
 SUM_FREQ = 100
+MODEL_SAVE_FREQ = 1000
 VAL_FREQ = 5000
+LOG_PATH = './tensorflow/logdir'
 
 
 def sequence_loss(flow_preds, flow_gt, valid, gamma=0.8, max_flow=MAX_FLOW):
@@ -105,6 +115,7 @@ class Logger:
         self.writer = None
 
     def _print_training_status(self):
+        print("\n_print_training_status!!!!!!!!!!!!!!!\n")
         metrics_data = [self.running_loss[k]/SUM_FREQ for k in sorted(self.running_loss.keys())]
         training_str = "[{:6d}, {:10.7f}] ".format(self.total_steps+1, self.scheduler.get_last_lr()[0])
         metrics_str = ("{:10.4f}, "*len(metrics_data)).format(*metrics_data)
@@ -113,7 +124,9 @@ class Logger:
         print(training_str + metrics_str)
 
         if self.writer is None:
-            self.writer = SummaryWriter()
+            if not os.path.isdir(LOG_PATH):
+                os.makedirs(LOG_PATH)
+            self.writer = SummaryWriter(LOG_PATH)
 
         for k in self.running_loss:
             self.writer.add_scalar(k, self.running_loss[k]/SUM_FREQ, self.total_steps)
@@ -134,16 +147,29 @@ class Logger:
 
     def write_dict(self, results):
         if self.writer is None:
-            self.writer = SummaryWriter()
+            if not os.path.isdir(LOG_PATH):
+                os.makedirs(LOG_PATH)
+            self.writer = SummaryWriter(LOG_PATH)
+
 
         for key in results:
             self.writer.add_scalar(key, results[key], self.total_steps)
+
+    def add_scalar(self, name, val, iteration):
+        if self.writer is None:
+            if not os.path.isdir(LOG_PATH):
+                os.makedirs(LOG_PATH)
+            self.writer = SummaryWriter(LOG_PATH)
+            
+        self.writer.add_scalar(name, val, iteration)
 
     def close(self):
         if self.writer is not None:
             self.writer.close()
 
 def train(args):
+
+    iteration = 0
 
     model = nn.DataParallel(RAFT(args), device_ids=args.gpus)
     print("Parameter Count: %d" % count_parameters(model))
@@ -178,6 +204,9 @@ def train(args):
         pbar = tqdm(enumerate(train_loader), total=len(train_loader), dynamic_ncols=True)
 
         for i_batch, data_blob in pbar:
+
+            iteration += 1
+
             if total_steps >= args.num_steps:
                 should_keep_training = False
                 torch.save(model.state_dict(), 'checkpoints/final.pth')
@@ -213,20 +242,33 @@ def train(args):
             scheduler.step()
             scaler.update()
 
-            # logger.push(metrics)
+            logger.push(metrics)
             current_lr = optimizer.param_groups[0]['lr']
             pbar_str = (("steps: %d/%d, lr:%.6f, loss:%.4f") % (total_steps, args.num_steps, current_lr, float(loss)))
             pbar.set_description(pbar_str)
 
-            if total_steps % VAL_FREQ == 0:
+            logger.add_scalar("loss", float(loss), total_steps)
+        
+            # if total_steps % VAL_FREQ == 0:
+            #     torch.save({
+            #         'steps': total_steps, 
+            #         'model': model.state_dict(), 
+            #         'optim': optimizer.state_dict(),
+            #         'sched': scheduler.state_dict()
+            #         },
+            #         'checkpoints/latest.pth',
+            #     )
+
+            if iteration % MODEL_SAVE_FREQ == 0:  # Save checkpoint every n iterations
+                checkpoint_name = 'checkpoints/iter_%d.pth' % iteration  # Change checkpoint filename
                 torch.save({
-                    'steps': total_steps, 
-                    'model': model.state_dict(), 
+                    'steps': total_steps,
+                    'model': model.state_dict(),
                     'optim': optimizer.state_dict(),
                     'sched': scheduler.state_dict()
-                    },
-                    'checkpoints/latest.pth',
-                )
+                }, checkpoint_name)
+
+
                 results = {}
                 for val_dataset in args.validation:
                     assert (val_dataset == 'occlinemod')
@@ -272,6 +314,8 @@ if __name__ == '__main__':
     parser.add_argument('--add_noise', action='store_true')
     args = parser.parse_args()
 
+    # pdb.set_trace()
+
     torch.manual_seed(1234)
     np.random.seed(1234)
 
@@ -282,7 +326,7 @@ if __name__ == '__main__':
     ])
     args.render_K = render_K
 
-    if not os.path.isdir('checkpoints'):
-        os.mkdir('checkpoints')
+    if not os.path.isdir('./checkpoints'):
+        os.mkdir('./checkpoints')
 
     train(args)
